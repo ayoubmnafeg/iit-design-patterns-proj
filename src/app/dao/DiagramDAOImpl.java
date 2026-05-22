@@ -9,7 +9,7 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-// Persistence: handles saving and loading diagrams from SQL database.
+
 public class DiagramDAOImpl implements DiagramDAO {
     private final Connection conn = DBConnectionManager.getInstance().getConnection();
     private final DiagramElementJdbcAdapter elementAdapter = new DiagramElementJdbcAdapter();

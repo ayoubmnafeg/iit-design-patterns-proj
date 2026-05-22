@@ -5,8 +5,8 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.time.LocalDateTime;
 
-// Design Pattern: Strategy
-// Purpose: Logger implementation that appends to a log file.
+
+
 public class FileLogger implements LoggerStrategy {
     private static final String FILE_PATH = "bpmn-log.txt";
 

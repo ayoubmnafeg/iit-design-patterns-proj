@@ -5,11 +5,11 @@ import app.model.ElementType;
 import app.model.elements.*;
 import app.util.IdGenerator;
 
-// Design Pattern: Factory Method
-// Purpose: Creates concrete BPMN node elements (events, tasks, gateways) for the canvas and for load-from-DB.
+
+
 public class BPMNNodeElementFactory implements NodeElementFactory {
 
-    // Factory Method: creates a new node with a generated id and default label.
+
     @Override
     public DiagramElement createElement(ElementType type, double x, double y) {
         String id = IdGenerator.generateId();
@@ -40,7 +40,7 @@ public class BPMNNodeElementFactory implements NodeElementFactory {
         }
     }
 
-    // Factory Method: restores a node from database fields (fixed id and label).
+
     @Override
     public DiagramElement createElementWithStoredId(
             ElementType type, String id, double x, double y, String label) {

@@ -28,7 +28,7 @@ public class LogConsoleView extends VBox {
     public LogConsoleView() {
         setStyle("-fx-background-color: #ffffff;");
 
-        // ── Header ────────────────────────────────────────────────────────────
+
         Label title = new Label("Log Console");
         title.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #374151;");
 
@@ -53,7 +53,7 @@ public class LogConsoleView extends VBox {
         dbBtn.selectedProperty().addListener((obs, o, n)      -> dbBtn.setStyle(n ? TOGGLE_ACTIVE : TOGGLE_BASE));
         uiBtn.selectedProperty().addListener((obs, o, n)      -> uiBtn.setStyle(n ? TOGGLE_ACTIVE : TOGGLE_BASE));
 
-        // Prevent deselecting all — at least one always selected
+
         group.selectedToggleProperty().addListener((obs, oldToggle, newToggle) -> {
             if (newToggle == null && oldToggle != null) oldToggle.setSelected(true);
         });
@@ -64,7 +64,7 @@ public class LogConsoleView extends VBox {
         header.setAlignment(Pos.CENTER_LEFT);
         header.setPadding(new Insets(10, 12, 10, 12));
 
-        // ── TextArea ──────────────────────────────────────────────────────────
+
         textArea = new TextArea();
         textArea.setEditable(false);
         textArea.setWrapText(false);
@@ -73,7 +73,7 @@ public class LogConsoleView extends VBox {
                           "-fx-background-color: #1e1e1e;");
         VBox.setVgrow(textArea, Priority.ALWAYS);
 
-        // ── Observer: append entries ──────────────────────────────────────────
+
         AppLogger.getInstance().getEntries().addListener((ListChangeListener<String>) change -> {
             while (change.next()) {
                 if (change.wasAdded()) {

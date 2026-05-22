@@ -52,7 +52,7 @@ public class PaletteView extends HBox {
         setMaxWidth(Region.USE_PREF_SIZE);
         setMaxHeight(Region.USE_PREF_SIZE);
 
-        // ── Tools ─────────────────────────────────────────────────────────────
+
         addPng("select", "/app/resources/icons/selection.png", "Select",     () -> { if (onSelectTool != null) onSelectTool.run(); });
         addPng("hand",   "/app/resources/icons/cursor.png",    "Pan Canvas", () -> { if (onHandTool   != null) onHandTool.run();   });
         addActionSvgBtn("/app/resources/icons/eraser.svg", "Erase Nodes and Links",
@@ -60,7 +60,7 @@ public class PaletteView extends HBox {
 
         sep();
 
-        // ── Start Event (base) + variants flyout ──────────────────────────────
+
         addGroupBtn("start", "/app/resources/icons/start-event.svg", "Start Event",
             ElementType.START_EVENT,
             new String[]{"msg-start",   "timer-start",  "cond-start",  "sig-start",   "err-start"},
@@ -74,7 +74,7 @@ public class PaletteView extends HBox {
                               ElementType.CONDITIONAL_START, ElementType.SIGNAL_START,
                               ElementType.ERROR_START});
 
-        // ── Intermediate Event (base) + variants flyout ───────────────────────
+
         addGroupBtn("inter", "/app/resources/icons/intermediate-event.svg", "Intermediate Event",
             ElementType.INTERMEDIATE_EVENT,
             new String[]{"msg-catch","timer-catch","cond-catch","link-catch","sig-catch","err-catch",
@@ -97,7 +97,7 @@ public class PaletteView extends HBox {
                               ElementType.MESSAGE_THROW, ElementType.LINK_THROW,
                               ElementType.SIGNAL_THROW});
 
-        // ── End Event (base) + variants flyout ───────────────────────────────
+
         addGroupBtn("end", "/app/resources/icons/end-event.svg", "End Event",
             ElementType.END_EVENT,
             new String[]{"msg-end", "sig-end", "err-end"},
@@ -109,13 +109,13 @@ public class PaletteView extends HBox {
 
         sep();
 
-        // ── Single buttons ────────────────────────────────────────────────────
+
         addSvgBtn("task", "/app/resources/icons/task.svg",         "Task",          ElementType.TASK);
         addSvgBtn("xor",  "/app/resources/icons/gateway.svg",       "Gateway (XOR)", ElementType.EXCLUSIVE_GATEWAY);
 
     }
 
-    // ── Group button with flyout ──────────────────────────────────────────────
+
 
     private void addGroupBtn(String key, String svgPath, String tip, ElementType baseType,
                              String[] varKeys, String[] varSvgs, String[] varTips,
@@ -132,10 +132,10 @@ public class PaletteView extends HBox {
                 return;
             }
             closeOpenPopup();
-            // Default: select base type immediately
+
             activateBase(btn, key, svgPath);
             selectTool(baseType);
-            // Show flyout above button
+
             showPopupAbove(popup, btn);
             openPopup = popup;
         });
@@ -152,9 +152,9 @@ public class PaletteView extends HBox {
                      "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.18), 12, 0, 0, 3); " +
                      "-fx-padding: 6 10 6 10;");
 
-        // Separator label
+
         if (varKeys.length > 6) {
-            // split catch / throw with a tiny label
+
             for (int i = 0; i < varKeys.length; i++) {
                 if (i == 6) {
                     Label lbl = new Label("│");
@@ -187,7 +187,7 @@ public class PaletteView extends HBox {
         vb.setOnMouseEntered(e -> vb.setStyle(VAR_BTN_HV));
         vb.setOnMouseExited(e  -> vb.setStyle(VAR_BTN));
         vb.setOnAction(e -> {
-            // Update parent button's icon to the chosen variant
+
             parentBtn.setGraphic(wrap(SvgIcon.render(svgPath, ICON_SIZE), ICON_SIZE));
             activateBase(parentBtn, parentKey, svgPath);
             selectTool(type);
@@ -196,7 +196,7 @@ public class PaletteView extends HBox {
         return vb;
     }
 
-    // ── Simple SVG button ─────────────────────────────────────────────────────
+
 
     private void addSvgBtn(String key, String svgPath, String tip, ElementType type) {
         Button btn = makeBtn(tip);
@@ -222,7 +222,7 @@ public class PaletteView extends HBox {
         getChildren().add(btn);
     }
 
-    // ── PNG button ────────────────────────────────────────────────────────────
+
 
     private void addPng(String key, String path, String tip, Runnable action) {
         Button btn = makeBtn(tip);
@@ -244,7 +244,7 @@ public class PaletteView extends HBox {
         getChildren().add(btn);
     }
 
-    // ── Text button ───────────────────────────────────────────────────────────
+
 
     private void addTextBtn(String key, String label, String tip, Runnable action) {
         Button btn = makeBtn(tip);
@@ -258,7 +258,7 @@ public class PaletteView extends HBox {
         getChildren().add(btn);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+
 
     private Button makeBtn(String tip) {
         Button btn = new Button();
@@ -294,7 +294,7 @@ public class PaletteView extends HBox {
     }
 
     private void showPopupAbove(Popup popup, Button btn) {
-        // Show after layout so we have screen coords
+
         btn.getScene().getWindow().requestFocus();
         javafx.application.Platform.runLater(() -> {
             javafx.geometry.Bounds b = btn.localToScreen(btn.getBoundsInLocal());
@@ -309,7 +309,7 @@ public class PaletteView extends HBox {
         if (onElementSelected != null) onElementSelected.accept(type);
     }
 
-    // ── Setters ───────────────────────────────────────────────────────────────
+
     public void setOnElementSelected(Consumer<ElementType> h) { onElementSelected = h; }
     public void setOnLoad(Runnable h)        { onLoad = h; }
     public void setOnCycleLogger(Runnable h) { onCycleLogger = h; }

@@ -7,8 +7,8 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
 
-// Design Pattern: Singleton
-// Purpose: Centralizes SQL connection configuration and a single shared Connection for the application.
+
+
 public class DBConnectionManager {
     private static DBConnectionManager instance;
     private Connection connection;

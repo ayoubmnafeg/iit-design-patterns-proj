@@ -5,8 +5,8 @@ import javafx.collections.ObservableList;
 
 import java.util.Optional;
 
-// Design Pattern: Observer
-// Purpose: Exposes an observable element list so views update when the diagram model changes.
+
+
 public class Diagram {
     private String name;
     private int dbId = -1;

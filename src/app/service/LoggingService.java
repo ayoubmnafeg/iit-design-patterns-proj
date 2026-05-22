@@ -8,7 +8,7 @@ import app.logging.UILogger;
 import app.logging.TimestampPrefixLoggerDecorator;
 import app.logging.ConsoleLogger;
 
-// Coordinates the active logger Strategy (app.logging.LoggerStrategy) for the app.
+
 public class LoggingService {
     private final AppLogger logger = AppLogger.getInstance();
     private int currentIndex = 0;
@@ -62,7 +62,7 @@ public class LoggingService {
         };
     }
 
-    // Decorator: adds timestamp prefix to the console strategy without modifying ConsoleLogger.
+
     private LoggerStrategy wrapConsoleStrategy() {
         return new TimestampPrefixLoggerDecorator(consoleLogger);
     }

@@ -83,7 +83,7 @@ public class SvgIcon {
 
             iv.setImage(javafx.embed.swing.SwingFXUtils.toFXImage(bi, null));
         } catch (Exception e) {
-            // leave ImageView empty on error
+
         }
         return iv;
     }

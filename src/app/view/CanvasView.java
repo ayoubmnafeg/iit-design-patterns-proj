@@ -64,7 +64,7 @@ public class CanvasView extends Pane {
     private final Pane nodeLayer;
     private Node connectorPreview;
 
-    // Pan state
+
     private double panOffsetX = 0, panOffsetY = 0;
     private double dragStartX, dragStartY;
     private double nodeDragStartSceneX, nodeDragStartSceneY;
@@ -96,7 +96,7 @@ public class CanvasView extends Pane {
         contentLayer.getChildren().addAll(flowLayer, nodeLayer);
         getChildren().addAll(dotCanvas, contentLayer);
 
-        // Observer: react to model changes
+
         diagram.getElements().addListener((ListChangeListener<DiagramElement>) change -> {
             refresh();
         });

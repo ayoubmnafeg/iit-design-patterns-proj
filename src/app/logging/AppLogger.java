@@ -5,8 +5,8 @@ import javafx.collections.ObservableList;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 
-// Design Pattern: Singleton
-// Purpose: One shared application logger, strategy-backed sink, and observable log entries for the log console.
+
+
 public class AppLogger {
     private volatile LoggerStrategy strategy = new ConsoleLogger();
     private final ObservableList<String> entries = FXCollections.observableArrayList();

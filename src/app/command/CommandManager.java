@@ -31,7 +31,7 @@ public class CommandManager {
     public boolean canUndo() { return !history.isEmpty(); }
     public boolean canRedo() { return !redoHistory.isEmpty(); }
 
-    // Undo support: clears reversible diagram actions when starting or loading a project.
+
     public void clear() {
         history.clear();
         redoHistory.clear();

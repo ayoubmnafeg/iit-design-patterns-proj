@@ -46,7 +46,7 @@ public class LogConsoleController {
         } else if ("UI".equals(current)) {
             view.getUiBtn().setSelected(true);
         } else {
-            // "Console" or "Console +ts" and other console-backed names
+
             view.getConsoleBtn().setSelected(true);
         }
     }

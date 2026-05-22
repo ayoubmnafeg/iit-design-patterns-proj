@@ -11,8 +11,8 @@ import app.model.elements.SequenceFlowElement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-// Design Pattern: Adapter
-// Purpose: Adapts JDBC result set row data to domain DiagramElement instances for diagram load.
+
+
 public class DiagramElementJdbcAdapter {
 
     private final NodeElementFactory nodeFactory;
@@ -31,7 +31,7 @@ public class DiagramElementJdbcAdapter {
         this.flowFactory = flowFactory;
     }
 
-    // Adapter: maps one diagram_elements row to a domain element.
+
     public DiagramElement fromRow(ResultSet rs) throws SQLException {
         String id = rs.getString("id");
         ElementType type = ElementType.valueOf(rs.getString("type"));
@@ -48,7 +48,7 @@ public class DiagramElementJdbcAdapter {
                 sf.setSourceAnchor(rs.getDouble("src_anchor_x"), rs.getDouble("src_anchor_y"));
                 sf.setTargetAnchor(rs.getDouble("tgt_anchor_x"), rs.getDouble("tgt_anchor_y"));
             } catch (SQLException ignored) {
-                // optional columns
+
             }
             return sf;
         }

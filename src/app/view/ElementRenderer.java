@@ -70,14 +70,14 @@ public class ElementRenderer {
             }
         }
 
-        // Connector dots at N/E/S/W — hidden until hover
+
         double hw = halfWidth(element);
         double hh = halfHeight(element);
         Circle[] dots = {
-            makeDot(0,   -hh, element, 0,   -hh, onConnector),  // N
-            makeDot(hw,  0,   element, hw,  0,   onConnector),  // E
-            makeDot(0,   hh,  element, 0,   hh,  onConnector),  // S
-            makeDot(-hw, 0,   element, -hw, 0,   onConnector),  // W
+            makeDot(0,   -hh, element, 0,   -hh, onConnector),
+            makeDot(hw,  0,   element, hw,  0,   onConnector),
+            makeDot(0,   hh,  element, 0,   hh,  onConnector),
+            makeDot(-hw, 0,   element, -hw, 0,   onConnector),
         };
         for (Circle d : dots) {
             d.setVisible(false);
