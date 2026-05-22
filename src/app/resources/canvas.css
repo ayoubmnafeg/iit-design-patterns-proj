@@ -1,0 +1,43 @@
+﻿.canvas-pane {
+    -fx-background-color: #f8f8f8;
+    -fx-background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAAKklEQVQ4jWNgYGD4z8BQDwAAAP//AwBJ4gH5eQZPzQAAAABJRU5ErkJggg==");
+}
+
+.palette-bar {
+    -fx-background-color: white;
+    -fx-background-radius: 40;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.18), 16, 0, 0, 4);
+    -fx-padding: 8 14 8 14;
+    -fx-spacing: 2;
+}
+
+.palette-btn {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 7 10 7 10;
+    -fx-cursor: hand;
+    -fx-font-size: 16px;
+    -fx-min-width: 36px;
+    -fx-min-height: 36px;
+    -fx-max-width: 36px;
+    -fx-max-height: 36px;
+}
+
+.palette-btn:hover {
+    -fx-background-color: #f0f0f0;
+    -fx-background-radius: 8;
+}
+
+.palette-btn-active {
+    -fx-background-color: #ede9ff;
+    -fx-background-radius: 8;
+    -fx-border-color: transparent;
+}
+
+.palette-sep {
+    -fx-padding: 0 4 0 4;
+    -fx-opacity: 0.3;
+}
+
