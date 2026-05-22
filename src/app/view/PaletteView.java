@@ -41,7 +41,7 @@ public class PaletteView extends HBox {
     private Popup  openPopup = null;
 
     private Consumer<ElementType> onElementSelected;
-    private Runnable onLoad, onCycleLogger, onSelectTool, onHandTool;
+    private Runnable onLoad, onCycleLogger, onSelectTool, onHandTool, onDeleteTool;
 
     public PaletteView() {
         setStyle("-fx-background-color: white; -fx-background-radius: 40; " +
@@ -55,6 +55,8 @@ public class PaletteView extends HBox {
         // ── Tools ─────────────────────────────────────────────────────────────
         addPng("select", "/app/resources/icons/selection.png", "Select",     () -> { if (onSelectTool != null) onSelectTool.run(); });
         addPng("hand",   "/app/resources/icons/cursor.png",    "Pan Canvas", () -> { if (onHandTool   != null) onHandTool.run();   });
+        addActionSvgBtn("/app/resources/icons/eraser.svg", "Erase Nodes and Links",
+            () -> { if (onDeleteTool != null) onDeleteTool.run(); });
 
         sep();
 
@@ -110,13 +112,7 @@ public class PaletteView extends HBox {
         // ── Single buttons ────────────────────────────────────────────────────
         addSvgBtn("task", "/app/resources/icons/task.svg",         "Task",          ElementType.TASK);
         addSvgBtn("xor",  "/app/resources/icons/gateway.svg",       "Gateway (XOR)", ElementType.EXCLUSIVE_GATEWAY);
-        addSvgBtn("flow", "/app/resources/icons/sequence-flow.svg", "Sequence Flow", ElementType.SEQUENCE_FLOW);
 
-        sep();
-
-        // ── Actions ───────────────────────────────────────────────────────────
-        addActionSvgBtn("/app/resources/icons/log-script.svg", "Cycle Logger",
-            () -> { if (onCycleLogger != null) onCycleLogger.run(); });
     }
 
     // ── Group button with flyout ──────────────────────────────────────────────
@@ -218,8 +214,9 @@ public class PaletteView extends HBox {
         btn.setGraphic(wrap(SvgIcon.render(svgPath, ICON_SIZE), ICON_SIZE));
         btn.setOnAction(e -> {
             closeOpenPopup();
-            if (activeBtn != null) activeBtn.setStyle(BTN_BASE);
-            activeBtn = null;
+            if (activeBtn != null) { activeBtn.setStyle(BTN_BASE); }
+            activeBtn = btn;
+            btn.setStyle(BTN_ACTIVE);
             action.run();
         });
         getChildren().add(btn);
@@ -318,4 +315,5 @@ public class PaletteView extends HBox {
     public void setOnCycleLogger(Runnable h) { onCycleLogger = h; }
     public void setOnSelectTool(Runnable h)  { onSelectTool = h; }
     public void setOnHandTool(Runnable h)    { onHandTool = h; }
+    public void setOnDeleteTool(Runnable h)  { onDeleteTool = h; }
 }

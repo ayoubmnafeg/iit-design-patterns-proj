@@ -9,6 +9,7 @@ import app.factory.BPMNElementFactory;
 import app.model.Diagram;
 import app.model.DiagramElement;
 import app.model.ElementType;
+import app.model.elements.SequenceFlowElement;
 
 import java.util.List;
 
@@ -48,16 +49,50 @@ public class DiagramService {
 
     public void removeElement(String id) {
         diagram.getElementById(id).ifPresent(el -> {
-            commandManager.executeCommand(new RemoveElementCommand(diagram, el));
+            List<DiagramElement> elementsToRemove = new java.util.ArrayList<>();
+            elementsToRemove.add(el);
+            if (el.getType() != ElementType.SEQUENCE_FLOW) {
+                diagram.getElements().stream()
+                    .filter(candidate -> candidate.getType() == ElementType.SEQUENCE_FLOW)
+                    .map(candidate -> (SequenceFlowElement) candidate)
+                    .filter(flow -> flow.getSourceId().equals(id) || flow.getTargetId().equals(id))
+                    .forEach(elementsToRemove::add);
+            }
+            commandManager.executeCommand(new RemoveElementCommand(diagram, elementsToRemove));
             loggingService.log("Removed " + el.getType() + " id=" + id);
         });
     }
 
     public void moveElement(String id, double x, double y) {
         diagram.getElementById(id).ifPresent(el -> {
+            double dx = x - el.getX();
+            double dy = y - el.getY();
             el.setX(x);
             el.setY(y);
+            moveConnectedFlowAnchors(id, dx, dy);
         });
+    }
+
+    private void moveConnectedFlowAnchors(String elementId, double dx, double dy) {
+        if (dx == 0 && dy == 0) return;
+
+        diagram.getElements().stream()
+            .filter(e -> e.getType() == ElementType.SEQUENCE_FLOW)
+            .map(e -> (SequenceFlowElement) e)
+            .forEach(flow -> {
+                if (flow.getSourceId().equals(elementId)) {
+                    flow.setSourceAnchor(
+                        flow.getSourceAnchorX() + dx,
+                        flow.getSourceAnchorY() + dy
+                    );
+                }
+                if (flow.getTargetId().equals(elementId)) {
+                    flow.setTargetAnchor(
+                        flow.getTargetAnchorX() + dx,
+                        flow.getTargetAnchorY() + dy
+                    );
+                }
+            });
     }
 
     public void updateElementLabel(String id, String label) {
@@ -70,6 +105,11 @@ public class DiagramService {
     public void undo() {
         commandManager.undo();
         loggingService.log("Undo");
+    }
+
+    public void redo() {
+        commandManager.redo();
+        loggingService.log("Redo");
     }
 
     public void saveDiagram() {
@@ -91,6 +131,7 @@ public class DiagramService {
 
     public Diagram getDiagram() { return diagram; }
     public boolean canUndo() { return commandManager.canUndo(); }
+    public boolean canRedo() { return commandManager.canRedo(); }
 
     private DiagramDAO createDiagramDAO() {
         return new DiagramDAOImpl();

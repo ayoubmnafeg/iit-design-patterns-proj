@@ -3,15 +3,17 @@ package app.view;
 import app.model.DiagramElement;
 import app.model.ElementType;
 import app.model.elements.SequenceFlowElement;
-import app.view.CanvasView.ConnectorClickHandler;
+import app.view.CanvasView.ConnectorDragHandler;
 import javafx.scene.Group;
 import javafx.scene.image.ImageView;
 import javafx.scene.control.Label;
+import javafx.scene.control.Tooltip;
 import javafx.scene.text.TextAlignment;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.*;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
+import javafx.util.Duration;
 
 public class ElementRenderer {
 
@@ -28,9 +30,9 @@ public class ElementRenderer {
     private static final double DOT_R       = 5;
     private static final Color  DOT_FILL    = Color.web("#4a90d9");
     private static final Color  DOT_STROKE  = Color.WHITE;
-    private static final double DOT_STROKE_W = 1.5;
+    private static final double DOT_STROKE_W = 1.2;
 
-    public static Group renderNode(DiagramElement element, ConnectorClickHandler onConnector,
+    public static Group renderNode(DiagramElement element, ConnectorDragHandler onConnector,
                                    boolean highlighted) {
         Group container = new Group();
         ElementType type = element.getType();
@@ -59,8 +61,14 @@ public class ElementRenderer {
         ImageView marker = buildMarker(type);
         if (marker != null) container.getChildren().add(marker);
 
-        Label label = buildLabel(element.getLabel(), element);
-        container.getChildren().add(label);
+        Tooltip tooltip = createNodeTooltip(element);
+        if (tooltip != null) {
+            Tooltip.install(container, tooltip);
+            Tooltip.install(symbol, tooltip);
+            if (marker != null) {
+                Tooltip.install(marker, tooltip);
+            }
+        }
 
         // Connector dots at N/E/S/W — hidden until hover
         double hw = halfWidth(element);
@@ -82,24 +90,61 @@ public class ElementRenderer {
         return container;
     }
 
+    private static Tooltip createNodeTooltip(DiagramElement element) {
+        if (element.getLabel() == null || element.getLabel().isBlank()) {
+            return null;
+        }
+
+        Tooltip tooltip = new Tooltip(element.getLabel());
+        tooltip.setShowDelay(Duration.millis(150));
+        tooltip.setShowDuration(Duration.seconds(8));
+        tooltip.setHideDelay(Duration.millis(80));
+        return tooltip;
+    }
+
     private static Circle makeDot(double cx, double cy, DiagramElement element,
                                    double anchorOffX, double anchorOffY,
-                                   ConnectorClickHandler onConnector) {
+                                   ConnectorDragHandler onConnector) {
         Circle dot = new Circle(cx, cy, DOT_R);
+        dot.getProperties().put("connectorDot", true);
         dot.setFill(DOT_FILL);
         dot.setStroke(DOT_STROKE);
         dot.setStrokeWidth(DOT_STROKE_W);
-        dot.setOnMouseEntered(e -> { dot.setScaleX(1.3); dot.setScaleY(1.3); });
+        dot.setOnMouseEntered(e -> { dot.setScaleX(1.25); dot.setScaleY(1.25); });
         dot.setOnMouseExited(e  -> { dot.setScaleX(1.0); dot.setScaleY(1.0); });
-        dot.setOnMouseClicked(e -> {
+        dot.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
             if (onConnector != null) {
                 double worldX = element.getX() + anchorOffX;
                 double worldY = element.getY() + anchorOffY;
-                onConnector.accept(element, worldX, worldY);
+                onConnector.start(element, worldX, worldY);
+                dot.startFullDrag();
+            }
+            e.consume();
+        });
+        dot.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_DRAGGED, e -> {
+            if (onConnector != null) {
+                onConnector.drag(e.getSceneX(), e.getSceneY());
+            }
+            e.consume();
+        });
+        dot.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_RELEASED, e -> {
+            if (onConnector != null) {
+                onConnector.finish(e.getSceneX(), e.getSceneY());
             }
             e.consume();
         });
         return dot;
+    }
+
+    public static double[][] connectorOffsets(DiagramElement element) {
+        double hw = halfWidth(element);
+        double hh = halfHeight(element);
+        return new double[][] {
+            {0, -hh},
+            {hw, 0},
+            {0, hh},
+            {-hw, 0}
+        };
     }
 
     public static Group renderFlow(DiagramElement source, DiagramElement target,
@@ -118,11 +163,20 @@ public class ElementRenderer {
             y2 = target.getY();
         }
 
-        Line line = new Line(x1, y1, x2, y2);
-        line.setStroke(Color.BLACK);
-        line.setStrokeWidth(1.5);
+        boolean sourceHorizontal = isHorizontalAnchor(source, x1, y1);
+        boolean targetHorizontal = isHorizontalAnchor(target, x2, y2);
+        double[][] points = orthogonalPoints(x1, y1, x2, y2, sourceHorizontal, targetHorizontal);
+        Path path = buildOrthogonalFlowPath(x1, y1, x2, y2, sourceHorizontal, targetHorizontal);
+        path.setFill(Color.TRANSPARENT);
+        path.setStroke(Color.BLACK);
+        path.setStrokeWidth(1.5);
 
-        double angle      = Math.atan2(y2 - y1, x2 - x1);
+        Path hitPath = buildOrthogonalFlowPath(x1, y1, x2, y2, sourceHorizontal, targetHorizontal);
+        hitPath.setFill(Color.TRANSPARENT);
+        hitPath.setStroke(Color.TRANSPARENT);
+        hitPath.setStrokeWidth(12);
+
+        double angle      = flowArrowAngle(x1, y1, x2, y2, targetHorizontal);
         double arrowLen   = 12;
         double arrowAngle = Math.toRadians(25);
         Polygon arrowHead = new Polygon(
@@ -131,7 +185,123 @@ public class ElementRenderer {
             x2 - arrowLen * Math.cos(angle + arrowAngle), y2 - arrowLen * Math.sin(angle + arrowAngle)
         );
         arrowHead.setFill(Color.BLACK);
-        return new Group(line, arrowHead);
+
+        Group flowGroup = new Group(hitPath, path, arrowHead);
+        if (sf.getLabel() != null && !sf.getLabel().isBlank()) {
+            flowGroup.getChildren().add(buildFlowLabel(sf.getLabel(), points));
+        }
+        return flowGroup;
+    }
+
+    private static Label buildFlowLabel(String labelText, double[][] points) {
+        double[] position = midpointAlongPath(points);
+        Label label = new Label(labelText);
+        label.setFont(Font.font("Arial", 11));
+        label.setTextFill(Color.web("#374151"));
+        label.setStyle("-fx-background-color: rgba(255,255,255,0.88); " +
+                       "-fx-background-radius: 5; -fx-padding: 2 5 2 5;");
+        label.setLayoutX(position[0] - 28);
+        label.setLayoutY(position[1] - 20);
+        return label;
+    }
+
+    private static double[] midpointAlongPath(double[][] points) {
+        double totalLength = 0;
+        for (int i = 1; i < points.length; i++) {
+            totalLength += distance(points[i - 1], points[i]);
+        }
+
+        double halfway = totalLength / 2.0;
+        double traveled = 0;
+        for (int i = 1; i < points.length; i++) {
+            double segmentLength = distance(points[i - 1], points[i]);
+            if (traveled + segmentLength >= halfway) {
+                double ratio = segmentLength == 0 ? 0 : (halfway - traveled) / segmentLength;
+                return new double[] {
+                    points[i - 1][0] + (points[i][0] - points[i - 1][0]) * ratio,
+                    points[i - 1][1] + (points[i][1] - points[i - 1][1]) * ratio
+                };
+            }
+            traveled += segmentLength;
+        }
+        return points[points.length - 1];
+    }
+
+    private static double distance(double[] start, double[] end) {
+        return Math.hypot(end[0] - start[0], end[1] - start[1]);
+    }
+
+    public static Path buildOrthogonalFlowPath(double x1, double y1, double x2, double y2) {
+        return buildOrthogonalFlowPath(x1, y1, x2, y2, Math.abs(x2 - x1) >= Math.abs(y2 - y1), true);
+    }
+
+    public static Path buildOrthogonalFlowPath(double x1, double y1, double x2, double y2,
+                                               boolean sourceHorizontal,
+                                               boolean targetHorizontal) {
+        double[][] points = orthogonalPoints(x1, y1, x2, y2, sourceHorizontal, targetHorizontal);
+        Path path = new Path();
+        path.getElements().add(new MoveTo(points[0][0], points[0][1]));
+
+        for (int i = 1; i < points.length - 1; i++) {
+            double[] prev = points[i - 1];
+            double[] corner = points[i];
+            double[] next = points[i + 1];
+            double inDx = corner[0] - prev[0];
+            double inDy = corner[1] - prev[1];
+            double outDx = next[0] - corner[0];
+            double outDy = next[1] - corner[1];
+            double inLen = Math.hypot(inDx, inDy);
+            double outLen = Math.hypot(outDx, outDy);
+
+            if (inLen < 1 || outLen < 1) {
+                continue;
+            }
+
+            double radius = Math.min(12, Math.min(inLen / 2.0, outLen / 2.0));
+            double beforeX = corner[0] - (inDx / inLen) * radius;
+            double beforeY = corner[1] - (inDy / inLen) * radius;
+            double afterX = corner[0] + (outDx / outLen) * radius;
+            double afterY = corner[1] + (outDy / outLen) * radius;
+
+            path.getElements().add(new LineTo(beforeX, beforeY));
+            path.getElements().add(new QuadCurveTo(corner[0], corner[1], afterX, afterY));
+        }
+
+        path.getElements().add(new LineTo(points[points.length - 1][0], points[points.length - 1][1]));
+        return path;
+    }
+
+    private static double[][] orthogonalPoints(double x1, double y1, double x2, double y2,
+                                               boolean sourceHorizontal,
+                                               boolean targetHorizontal) {
+        if (Math.abs(x2 - x1) < 1 || Math.abs(y2 - y1) < 1) {
+            return new double[][] {{x1, y1}, {x2, y2}};
+        }
+
+        if (sourceHorizontal && targetHorizontal) {
+            double midX = (x1 + x2) / 2.0;
+            return new double[][] {{x1, y1}, {midX, y1}, {midX, y2}, {x2, y2}};
+        }
+        if (!sourceHorizontal && !targetHorizontal) {
+            double midY = (y1 + y2) / 2.0;
+            return new double[][] {{x1, y1}, {x1, midY}, {x2, midY}, {x2, y2}};
+        }
+        if (sourceHorizontal) {
+            return new double[][] {{x1, y1}, {x2, y1}, {x2, y2}};
+        }
+        return new double[][] {{x1, y1}, {x1, y2}, {x2, y2}};
+    }
+
+    private static boolean isHorizontalAnchor(DiagramElement element, double anchorX, double anchorY) {
+        return Math.abs(anchorX - element.getX()) >= Math.abs(anchorY - element.getY());
+    }
+
+    private static double flowArrowAngle(double x1, double y1, double x2, double y2,
+                                         boolean targetHorizontal) {
+        if (targetHorizontal) {
+            return x2 >= x1 ? 0 : Math.PI;
+        }
+        return y2 >= y1 ? Math.PI / 2 : -Math.PI / 2;
     }
 
     private static Group buildShape(DiagramElement element) {

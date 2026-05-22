@@ -17,6 +17,7 @@ public class CanvasController {
 
     private DiagramElement pendingFlowSource = null;
     private double pendingSourceAnchorX, pendingSourceAnchorY;
+    private boolean pendingSourceHorizontal = true;
     private String selectedNodeId = null;
 
     public CanvasController(DiagramService diagramService,
@@ -30,8 +31,29 @@ public class CanvasController {
 
         canvasView.setOnMouseClicked(e -> onCanvasClick(e.getX(), e.getY()));
         canvasView.setOnNodeClicked(this::onNodeClick);
+        canvasView.setOnFlowClicked(this::onFlowClick);
         canvasView.setOnNodeDragged(this::onNodeDragged);
-        canvasView.setOnConnectorClicked(this::onConnectorClick);
+        canvasView.setOnConnectorDragged(new CanvasView.ConnectorDragHandler() {
+            @Override
+            public void start(DiagramElement element, double anchorX, double anchorY) {
+                onConnectorDragStart(element, anchorX, anchorY);
+            }
+
+            @Override
+            public void drag(double sceneX, double sceneY) {
+                onConnectorDrag(sceneX, sceneY);
+            }
+
+            @Override
+            public void finish(double sceneX, double sceneY) {
+                onConnectorDragFinish(sceneX, sceneY);
+            }
+
+            @Override
+            public void cancel() {
+                onConnectorDragCancel();
+            }
+        });
     }
 
     private void onCanvasClick(double x, double y) {
@@ -63,8 +85,6 @@ public class CanvasController {
         if (paletteController.isDeleteMode()) {
             diagramService.removeElement(element.getId());
             selectedNodeId = null;
-            paletteController.clearAll();
-            paletteView.clearActive();
             return;
         }
 
@@ -75,6 +95,17 @@ public class CanvasController {
             if ((clickCount > 1 || alreadySelected) && element.getType() == ElementType.TASK) {
                 editTaskLabel(element);
             }
+        }
+    }
+
+    private void onFlowClick(app.model.elements.SequenceFlowElement flow, int clickCount) {
+        if (paletteController.isDeleteMode()) {
+            diagramService.removeElement(flow.getId());
+            return;
+        }
+
+        if (clickCount > 1) {
+            editFlowLabel(flow);
         }
     }
 
@@ -93,6 +124,20 @@ public class CanvasController {
               });
     }
 
+    private void editFlowLabel(DiagramElement element) {
+        TextInputDialog dialog = new TextInputDialog(element.getLabel());
+        dialog.setTitle("Edit Link");
+        dialog.setHeaderText("Link text");
+        dialog.setContentText("Label:");
+
+        Optional<String> result = dialog.showAndWait();
+        result.map(String::trim)
+              .ifPresent(text -> {
+                  diagramService.updateElementLabel(element.getId(), text);
+                  canvasView.refresh();
+              });
+    }
+
     private boolean onNodeDragged(DiagramElement element, double x, double y) {
         if (!paletteController.isSelectMode()) return false;
 
@@ -100,28 +145,57 @@ public class CanvasController {
         return true;
     }
 
-    private void onConnectorClick(DiagramElement element, double anchorX, double anchorY) {
+    private void onConnectorDragStart(DiagramElement element, double anchorX, double anchorY) {
         if (paletteController.isDeleteMode()) return;
 
-        if (pendingFlowSource == null) {
-            pendingFlowSource = element;
-            selectedNodeId = element.getId();
-            pendingSourceAnchorX = anchorX;
-            pendingSourceAnchorY = anchorY;
-            canvasView.highlightSourceElement(element.getId());
-        } else {
-            if (!pendingFlowSource.getId().equals(element.getId())) {
-                diagramService.addFlow(
-                    pendingFlowSource.getId(), element.getId(),
-                    pendingSourceAnchorX, pendingSourceAnchorY,
-                    anchorX, anchorY
-                );
-            }
-            pendingFlowSource = null;
-            selectedNodeId = null;
-            canvasView.clearHighlight();
-            paletteController.clearAll();
-            paletteView.clearActive();
+        pendingFlowSource = element;
+        selectedNodeId = element.getId();
+        pendingSourceAnchorX = anchorX;
+        pendingSourceAnchorY = anchorY;
+        pendingSourceHorizontal =
+            Math.abs(anchorX - element.getX()) >= Math.abs(anchorY - element.getY());
+        canvasView.showConnectorPreview(anchorX, anchorY, anchorX, anchorY, pendingSourceHorizontal);
+    }
+
+    private void onConnectorDrag(double sceneX, double sceneY) {
+        if (pendingFlowSource == null) return;
+
+        canvasView.showConnectorPreview(
+            pendingSourceAnchorX,
+            pendingSourceAnchorY,
+            canvasView.sceneToDiagramX(sceneX),
+            canvasView.sceneToDiagramY(sceneY),
+            pendingSourceHorizontal
+        );
+    }
+
+    private void onConnectorDragFinish(double sceneX, double sceneY) {
+        if (pendingFlowSource == null) return;
+
+        CanvasView.ConnectorTarget target =
+            canvasView.findConnectorTarget(sceneX, sceneY, pendingFlowSource.getId());
+        if (target != null) {
+            diagramService.addFlow(
+                pendingFlowSource.getId(), target.getElement().getId(),
+                pendingSourceAnchorX, pendingSourceAnchorY,
+                target.getAnchorX(), target.getAnchorY()
+            );
         }
+        clearPendingConnector();
+    }
+
+    private void onConnectorDragCancel() {
+        if (pendingFlowSource != null) {
+            clearPendingConnector();
+        }
+    }
+
+    private void clearPendingConnector() {
+        pendingFlowSource = null;
+        selectedNodeId = null;
+        canvasView.clearConnectorPreview();
+        canvasView.clearHighlight();
+        paletteController.clearAll();
+        paletteView.clearActive();
     }
 }

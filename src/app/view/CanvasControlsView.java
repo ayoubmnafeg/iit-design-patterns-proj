@@ -3,14 +3,22 @@ package app.view;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContentDisplay;
+import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Line;
+import javafx.scene.shape.Polygon;
+import javafx.scene.shape.SVGPath;
 
 public class CanvasControlsView extends HBox {
+    public enum ButtonMode {
+        ZOOM,
+        HISTORY
+    }
+
     private static final String ZOOM_GROUP_STYLE =
         "-fx-background-color: white; -fx-background-radius: 18; " +
         "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.16), 12, 0, 0, 3); " +
@@ -35,28 +43,54 @@ public class CanvasControlsView extends HBox {
 
     private Runnable onZoomOut;
     private Runnable onZoomIn;
+    private Runnable onUndo;
+    private Runnable onRedo;
     private Runnable onOpenLogs;
+    private Button undoButton;
+    private Button redoButton;
+    private Label zoomLabel;
 
     public CanvasControlsView() {
+        this(ButtonMode.HISTORY, true);
+    }
+
+    public CanvasControlsView(boolean showLoggerButton) {
+        this(ButtonMode.ZOOM, showLoggerButton);
+    }
+
+    public CanvasControlsView(ButtonMode buttonMode, boolean showLoggerButton) {
         setAlignment(Pos.CENTER);
         setSpacing(6);
         setMaxWidth(Region.USE_PREF_SIZE);
         setMaxHeight(Region.USE_PREF_SIZE);
         setPickOnBounds(false);
 
-        HBox zoomGroup = new HBox(2);
-        zoomGroup.setAlignment(Pos.CENTER);
-        zoomGroup.setMaxWidth(Region.USE_PREF_SIZE);
-        zoomGroup.setMaxHeight(Region.USE_PREF_SIZE);
-        zoomGroup.setStyle(ZOOM_GROUP_STYLE);
-        zoomGroup.getChildren().addAll(
-            createZoomButton("-", "Zoom Out", () -> run(onZoomOut)),
-            createZoomButton("+", "Zoom In", () -> run(onZoomIn))
-        );
+        HBox buttonGroup = new HBox(2);
+        buttonGroup.setAlignment(Pos.CENTER);
+        buttonGroup.setMaxWidth(Region.USE_PREF_SIZE);
+        buttonGroup.setMaxHeight(Region.USE_PREF_SIZE);
+        buttonGroup.setStyle(ZOOM_GROUP_STYLE);
 
-        Button loggerButton = createLoggerButton();
+        if (buttonMode == ButtonMode.ZOOM) {
+            zoomLabel = createZoomLabel();
+            buttonGroup.getChildren().addAll(
+                createZoomButton("-", "Zoom Out", () -> run(onZoomOut)),
+                zoomLabel,
+                createZoomButton("+", "Zoom In", () -> run(onZoomIn))
+            );
+        } else {
+            undoButton = createHistoryButton("Undo", false, () -> run(onUndo));
+            redoButton = createHistoryButton("Redo", true, () -> run(onRedo));
+            buttonGroup.getChildren().addAll(
+                undoButton,
+                redoButton
+            );
+        }
 
-        getChildren().addAll(zoomGroup, loggerButton);
+        getChildren().add(buttonGroup);
+        if (showLoggerButton) {
+            getChildren().add(createLoggerButton());
+        }
     }
 
     public void setOnZoomOut(Runnable handler) {
@@ -67,8 +101,31 @@ public class CanvasControlsView extends HBox {
         onZoomIn = handler;
     }
 
+    public void setOnUndo(Runnable handler) {
+        onUndo = handler;
+    }
+
+    public void setOnRedo(Runnable handler) {
+        onRedo = handler;
+    }
+
     public void setOnOpenLogs(Runnable handler) {
         onOpenLogs = handler;
+    }
+
+    public void setHistoryAvailability(boolean canUndo, boolean canRedo) {
+        if (undoButton != null) {
+            undoButton.setDisable(!canUndo);
+        }
+        if (redoButton != null) {
+            redoButton.setDisable(!canRedo);
+        }
+    }
+
+    public void setZoomPercent(int percent) {
+        if (zoomLabel != null) {
+            zoomLabel.setText(percent + "%");
+        }
     }
 
     private Button createZoomButton(String label, String tooltip, Runnable action) {
@@ -79,6 +136,33 @@ public class CanvasControlsView extends HBox {
         button.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
         button.setStyle(ZOOM_BUTTON_STYLE);
         button.setOnMouseEntered(event -> button.setStyle(ZOOM_BUTTON_HOVER_STYLE));
+        button.setOnMouseExited(event -> button.setStyle(ZOOM_BUTTON_STYLE));
+        button.setOnAction(event -> action.run());
+        return button;
+    }
+
+    private Label createZoomLabel() {
+        Label label = new Label("100%");
+        label.setAlignment(Pos.CENTER);
+        label.setMinWidth(42);
+        label.setPrefWidth(42);
+        label.setMaxWidth(42);
+        label.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #5f6368;");
+        return label;
+    }
+
+    private Button createHistoryButton(String tooltip, boolean pointsRight, Runnable action) {
+        Button button = new Button();
+        button.setFocusTraversable(false);
+        button.setTooltip(new Tooltip(tooltip));
+        button.setGraphic(createHistoryGlyph(pointsRight));
+        button.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+        button.setStyle(ZOOM_BUTTON_STYLE);
+        button.setOnMouseEntered(event -> {
+            if (!button.isDisabled()) {
+                button.setStyle(ZOOM_BUTTON_HOVER_STYLE);
+            }
+        });
         button.setOnMouseExited(event -> button.setStyle(ZOOM_BUTTON_STYLE));
         button.setOnAction(event -> action.run());
         return button;
@@ -116,6 +200,27 @@ public class CanvasControlsView extends HBox {
             glyph.getChildren().add(vertical);
         }
 
+        return glyph;
+    }
+
+    private StackPane createHistoryGlyph(boolean pointsRight) {
+        StackPane glyph = new StackPane();
+        glyph.setMinSize(16, 16);
+        glyph.setPrefSize(16, 16);
+        glyph.setMaxSize(16, 16);
+
+        SVGPath arrow = new SVGPath();
+        arrow.setContent(pointsRight
+            ? "M10.5 4 L14 7.5 L10.5 11 M13.5 7.5 H7.5 C4.8 7.5 3 9.1 3 11.5 C3 13.2 4.1 14.4 5.5 14.9"
+            : "M5.5 4 L2 7.5 L5.5 11 M2.5 7.5 H8.5 C11.2 7.5 13 9.1 13 11.5 C13 13.2 11.9 14.4 10.5 14.9"
+        );
+        arrow.setFill(Color.TRANSPARENT);
+        arrow.setStroke(Color.web("#5f6368"));
+        arrow.setStrokeWidth(1.7);
+        arrow.setStrokeLineCap(javafx.scene.shape.StrokeLineCap.ROUND);
+        arrow.setStrokeLineJoin(javafx.scene.shape.StrokeLineJoin.ROUND);
+
+        glyph.getChildren().add(arrow);
         return glyph;
     }
 

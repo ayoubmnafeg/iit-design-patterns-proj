@@ -33,20 +33,30 @@ public class MainController {
         CanvasView canvasView  = mainView.getCanvasView();
         PaletteView paletteView = mainView.getPaletteView();
         CanvasControlsView controlsView = mainView.getControlsView();
+        CanvasControlsView topZoomControlsView = mainView.getTopZoomControlsView();
 
         canvasController = new CanvasController(diagramService, paletteController, canvasView, paletteView);
 
         paletteView.setOnSelectTool(() -> {
             paletteController.setSelectMode();
             canvasView.setPanEnabled(false);
+            canvasView.setEraseMode(false);
             canvasView.setSelectMode(true);
         });
         paletteView.setOnHandTool(() -> {
             paletteController.setHandMode();
+            canvasView.setEraseMode(false);
             canvasView.setPanEnabled(true);
+        });
+        paletteView.setOnDeleteTool(() -> {
+            paletteController.setDeleteMode();
+            canvasView.setPanEnabled(false);
+            canvasView.setSelectMode(false);
+            canvasView.setEraseMode(true);
         });
         paletteView.setOnElementSelected(type -> {
             canvasView.setPanEnabled(false);
+            canvasView.setEraseMode(false);
             paletteController.selectTool(type);
         });
         paletteView.setOnLoad(this::handleLoad);
@@ -55,9 +65,28 @@ public class MainController {
             cycleLogger();
         });
 
-        controlsView.setOnZoomOut(canvasView::zoomOut);
-        controlsView.setOnZoomIn(canvasView::zoomIn);
+        controlsView.setOnUndo(() -> {
+            diagramService.undo();
+            refreshHistoryControls();
+        });
+        controlsView.setOnRedo(() -> {
+            diagramService.redo();
+            refreshHistoryControls();
+        });
         controlsView.setOnOpenLogs(this::openLogConsole);
+        topZoomControlsView.setOnZoomOut(() -> {
+            canvasView.zoomOut();
+            refreshZoomControls();
+        });
+        topZoomControlsView.setOnZoomIn(() -> {
+            canvasView.zoomIn();
+            refreshZoomControls();
+        });
+        refreshZoomControls();
+        diagram.getElements().addListener((javafx.collections.ListChangeListener<app.model.DiagramElement>) change ->
+            refreshHistoryControls()
+        );
+        refreshHistoryControls();
     }
 
     public void handleSave() {
@@ -102,9 +131,25 @@ public class MainController {
             if (mainView.getScene() != null) {
                 logConsoleStage.initOwner(mainView.getScene().getWindow());
             }
-            logConsoleStage.setOnCloseRequest(e -> logConsoleStage = null);
+            logConsoleStage.setOnCloseRequest(e -> {
+                e.consume();
+                logConsoleStage.hide();
+            });
         }
         logConsoleStage.show();
         logConsoleStage.toFront();
+    }
+
+    private void refreshHistoryControls() {
+        mainView.getControlsView().setHistoryAvailability(
+            diagramService.canUndo(),
+            diagramService.canRedo()
+        );
+    }
+
+    private void refreshZoomControls() {
+        mainView.getTopZoomControlsView().setZoomPercent(
+            mainView.getCanvasView().getZoomPercent()
+        );
     }
 }

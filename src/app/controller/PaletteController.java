@@ -3,7 +3,7 @@ package app.controller;
 import app.model.ElementType;
 
 public class PaletteController {
-    public enum Tool { SELECT, HAND, NONE }
+    public enum Tool { SELECT, HAND, DELETE, NONE }
 
     private ElementType selectedType = null;
     private boolean deleteMode = false;
@@ -43,8 +43,15 @@ public class PaletteController {
         if (deleteMode) {
             selectedType = null;
             flowMode = false;
-            activeTool = Tool.NONE;
+            activeTool = Tool.DELETE;
         }
+    }
+
+    public void setDeleteMode() {
+        deleteMode = true;
+        selectedType = null;
+        flowMode = false;
+        activeTool = Tool.DELETE;
     }
 
     public void clearAll() {
@@ -59,5 +66,5 @@ public class PaletteController {
     public boolean isFlowMode()          { return flowMode; }
     public boolean isSelectMode()        { return activeTool == Tool.SELECT; }
     public boolean isHandMode()          { return activeTool == Tool.HAND; }
+    public boolean isDeleteModeActive()  { return activeTool == Tool.DELETE; }
 }
-
