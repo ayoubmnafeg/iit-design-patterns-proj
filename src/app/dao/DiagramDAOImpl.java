@@ -17,17 +17,29 @@ public class DiagramDAOImpl implements DiagramDAO {
     @Override
     public int save(Diagram diagram) {
         try {
-            // Insert diagram row
-            PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO diagrams (name) VALUES (?)", Statement.RETURN_GENERATED_KEYS);
-            ps.setString(1, diagram.getName());
-            ps.executeUpdate();
-            ResultSet rs = ps.getGeneratedKeys();
-            rs.next();
-            int diagramId = rs.getInt(1);
-            diagram.setDbId(diagramId);
+            int diagramId = diagram.getDbId();
+            if (diagramId > 0) {
+                PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE diagrams SET name = ? WHERE id = ?");
+                ps.setString(1, diagram.getName());
+                ps.setInt(2, diagramId);
+                ps.executeUpdate();
 
-            // Insert elements
+                PreparedStatement deleteElements = conn.prepareStatement(
+                    "DELETE FROM diagram_elements WHERE diagram_id = ?");
+                deleteElements.setInt(1, diagramId);
+                deleteElements.executeUpdate();
+            } else {
+                PreparedStatement ps = conn.prepareStatement(
+                    "INSERT INTO diagrams (name) VALUES (?)", Statement.RETURN_GENERATED_KEYS);
+                ps.setString(1, diagram.getName());
+                ps.executeUpdate();
+                ResultSet rs = ps.getGeneratedKeys();
+                rs.next();
+                diagramId = rs.getInt(1);
+                diagram.setDbId(diagramId);
+            }
+
             PreparedStatement eps = conn.prepareStatement(
                 "INSERT INTO diagram_elements " +
                 "(id, diagram_id, type, x, y, label, source_id, target_id, " +

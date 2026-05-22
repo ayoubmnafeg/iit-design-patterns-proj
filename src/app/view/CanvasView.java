@@ -37,6 +37,11 @@ public class CanvasView extends Pane {
     }
 
     @FunctionalInterface
+    public interface NodeDragFinishedHandler {
+        void accept(DiagramElement element);
+    }
+
+    @FunctionalInterface
     public interface NodeClickHandler {
         void accept(DiagramElement element, int clickCount);
     }
@@ -50,6 +55,7 @@ public class CanvasView extends Pane {
     private NodeClickHandler onNodeClicked;
     private FlowClickHandler onFlowClicked;
     private NodeDragHandler onNodeDragged;
+    private NodeDragFinishedHandler onNodeDragFinished;
     private ConnectorDragHandler onConnectorDragged;
     private String highlightedElementId = null;
     private final Canvas dotCanvas;
@@ -165,6 +171,9 @@ public class CanvasView extends Pane {
                     }
                     if (nodeWasDragged) {
                         refresh();
+                        if (onNodeDragFinished != null) {
+                            onNodeDragFinished.accept(el);
+                        }
                     } else if (onNodeClicked != null) {
                         onNodeClicked.accept(el, e.getClickCount());
                     }
@@ -253,6 +262,10 @@ public class CanvasView extends Pane {
 
     public void setOnNodeDragged(NodeDragHandler handler) {
         this.onNodeDragged = handler;
+    }
+
+    public void setOnNodeDragFinished(NodeDragFinishedHandler handler) {
+        this.onNodeDragFinished = handler;
     }
 
     private boolean isConnectorDotEvent(javafx.event.Event event) {

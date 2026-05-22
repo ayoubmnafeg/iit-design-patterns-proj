@@ -8,10 +8,13 @@ import app.view.CanvasControlsView;
 import app.view.MainView;
 import app.view.PaletteView;
 import javafx.scene.control.ChoiceDialog;
+import javafx.scene.control.TextInputDialog;
 import app.view.LogConsoleView;
 import javafx.scene.Scene;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
+import java.io.File;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,7 +38,13 @@ public class MainController {
         CanvasControlsView controlsView = mainView.getControlsView();
         CanvasControlsView topZoomControlsView = mainView.getTopZoomControlsView();
 
-        canvasController = new CanvasController(diagramService, paletteController, canvasView, paletteView);
+        canvasController = new CanvasController(
+            diagramService,
+            paletteController,
+            canvasView,
+            paletteView,
+            this::refreshSaveAvailability
+        );
 
         paletteView.setOnSelectTool(() -> {
             paletteController.setSelectMode();
@@ -64,14 +73,20 @@ public class MainController {
             paletteController.clearAll();
             cycleLogger();
         });
+        mainView.setOnSaveProject(this::handleSave);
+        mainView.setOnNewProject(this::handleNewProject);
+        mainView.setOnImportJson(this::handleImportJson);
+        mainView.setOnExportJson(this::handleExportJson);
+        mainView.setOnRecentProjectSelected(this::handleRecentProject);
+        mainView.setOnAppMenuShowing(this::refreshRecentProjectsMenu);
 
         controlsView.setOnUndo(() -> {
             diagramService.undo();
-            refreshHistoryControls();
+            refreshProjectState();
         });
         controlsView.setOnRedo(() -> {
             diagramService.redo();
-            refreshHistoryControls();
+            refreshProjectState();
         });
         controlsView.setOnOpenLogs(this::openLogConsole);
         topZoomControlsView.setOnZoomOut(() -> {
@@ -84,13 +99,30 @@ public class MainController {
         });
         refreshZoomControls();
         diagram.getElements().addListener((javafx.collections.ListChangeListener<app.model.DiagramElement>) change ->
-            refreshHistoryControls()
+            refreshProjectState()
         );
         refreshHistoryControls();
+        refreshSaveAvailability();
     }
 
     public void handleSave() {
-        diagramService.saveDiagram();
+        if (diagramService.isSavedInDatabase()) {
+            return;
+        }
+        TextInputDialog dialog = new TextInputDialog(diagramService.getDiagram().getName());
+        dialog.setTitle("Save Project");
+        dialog.setHeaderText("Name this BPMN project");
+        dialog.setContentText("Project name:");
+        dialog.setOnShown(event -> dialog.getEditor().selectAll());
+
+        Optional<String> result = dialog.showAndWait();
+        result.map(String::trim)
+            .filter(name -> !name.isEmpty())
+            .ifPresent(name -> {
+                diagramService.saveDiagram(name);
+                refreshRecentProjectsMenu();
+                refreshSaveAvailability();
+            });
     }
 
     private void handleLoad() {
@@ -110,7 +142,73 @@ public class MainController {
         result.ifPresent(choice -> {
             int id = Integer.parseInt(choice.split(" — ")[0].trim());
             diagramService.loadDiagram(id);
+            refreshProjectState();
         });
+    }
+
+    private void handleNewProject() {
+        diagramService.newDiagram();
+        paletteController.clearAll();
+        CanvasView canvasView = mainView.getCanvasView();
+        canvasView.setPanEnabled(false);
+        canvasView.setEraseMode(false);
+        canvasView.setSelectMode(true);
+        refreshProjectState();
+    }
+
+    private void handleRecentProject(int diagramId) {
+        diagramService.loadDiagram(diagramId);
+        refreshProjectState();
+    }
+
+    private void handleExportJson() {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Export Diagram JSON");
+        chooser.setInitialFileName(defaultExportFileName());
+        chooser.getExtensionFilters().add(
+            new FileChooser.ExtensionFilter("JSON Files", "*.json")
+        );
+
+        File file = chooser.showSaveDialog(mainView.getScene().getWindow());
+        if (file != null) {
+            diagramService.exportJson(file.toPath());
+        }
+    }
+
+    private void handleImportJson() {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Import Diagram JSON");
+        chooser.getExtensionFilters().add(
+            new FileChooser.ExtensionFilter("JSON Files", "*.json")
+        );
+
+        File file = chooser.showOpenDialog(mainView.getScene().getWindow());
+        if (file != null) {
+            diagramService.importJson(file.toPath());
+            paletteController.clearAll();
+            CanvasView canvasView = mainView.getCanvasView();
+            canvasView.setPanEnabled(false);
+            canvasView.setEraseMode(false);
+            canvasView.setSelectMode(true);
+            refreshProjectState();
+        }
+    }
+
+    private void refreshRecentProjectsMenu() {
+        try {
+            mainView.setRecentProjects(diagramService.listSavedDiagrams());
+        } catch (RuntimeException e) {
+            mainView.setRecentProjects(java.util.Collections.emptyList());
+        }
+    }
+
+    private String defaultExportFileName() {
+        String name = diagramService.getDiagram().getName();
+        if (name == null || name.trim().isEmpty()) {
+            name = "diagram";
+        }
+        String safeName = name.trim().replaceAll("[^A-Za-z0-9._-]+", "-");
+        return safeName + ".json";
     }
 
     private void cycleLogger() {
@@ -145,6 +243,15 @@ public class MainController {
             diagramService.canUndo(),
             diagramService.canRedo()
         );
+    }
+
+    private void refreshSaveAvailability() {
+        mainView.setSaveProjectAvailable(!diagramService.isSavedInDatabase());
+    }
+
+    private void refreshProjectState() {
+        refreshHistoryControls();
+        refreshSaveAvailability();
     }
 
     private void refreshZoomControls() {

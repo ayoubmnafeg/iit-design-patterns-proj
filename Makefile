@@ -5,7 +5,7 @@ OUT_DIR := out/production/projmod
 MAIN_CLASS := app.MainApp
 JAVA_FX_MODULES := javafx.controls,javafx.swing
 SVG_JAR := lib/svgSalamander.jar
-MYSQL_JAR ?=
+MYSQL_JAR ?= lib/mysql-connector-j.jar
 CLASSPATH := $(OUT_DIR):$(SVG_JAR)$(if $(MYSQL_JAR),:$(MYSQL_JAR),)
 SOURCES := $(shell find $(SRC_DIR) -name "*.java")
 

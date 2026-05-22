@@ -14,6 +14,7 @@ public class CanvasController {
     private final PaletteController paletteController;
     private final CanvasView canvasView;
     private final PaletteView paletteView;
+    private final Runnable onDiagramChanged;
 
     private DiagramElement pendingFlowSource = null;
     private double pendingSourceAnchorX, pendingSourceAnchorY;
@@ -23,16 +24,19 @@ public class CanvasController {
     public CanvasController(DiagramService diagramService,
                             PaletteController paletteController,
                             CanvasView canvasView,
-                            PaletteView paletteView) {
+                            PaletteView paletteView,
+                            Runnable onDiagramChanged) {
         this.diagramService    = diagramService;
         this.paletteController = paletteController;
         this.canvasView        = canvasView;
         this.paletteView       = paletteView;
+        this.onDiagramChanged  = onDiagramChanged;
 
         canvasView.setOnMouseClicked(e -> onCanvasClick(e.getX(), e.getY()));
         canvasView.setOnNodeClicked(this::onNodeClick);
         canvasView.setOnFlowClicked(this::onFlowClick);
         canvasView.setOnNodeDragged(this::onNodeDragged);
+        canvasView.setOnNodeDragFinished(this::onNodeDragFinished);
         canvasView.setOnConnectorDragged(new CanvasView.ConnectorDragHandler() {
             @Override
             public void start(DiagramElement element, double anchorX, double anchorY) {
@@ -77,6 +81,7 @@ public class CanvasController {
             canvasView.toDiagramX(x),
             canvasView.toDiagramY(y)
         );
+        notifyDiagramChanged();
         paletteController.clearAll();
         paletteView.clearActive();
     }
@@ -84,6 +89,7 @@ public class CanvasController {
     private void onNodeClick(DiagramElement element, int clickCount) {
         if (paletteController.isDeleteMode()) {
             diagramService.removeElement(element.getId());
+            notifyDiagramChanged();
             selectedNodeId = null;
             return;
         }
@@ -101,6 +107,7 @@ public class CanvasController {
     private void onFlowClick(app.model.elements.SequenceFlowElement flow, int clickCount) {
         if (paletteController.isDeleteMode()) {
             diagramService.removeElement(flow.getId());
+            notifyDiagramChanged();
             return;
         }
 
@@ -120,6 +127,7 @@ public class CanvasController {
               .filter(text -> !text.isEmpty())
               .ifPresent(text -> {
                   diagramService.updateElementLabel(element.getId(), text);
+                  notifyDiagramChanged();
                   canvasView.highlightSourceElement(element.getId());
               });
     }
@@ -134,6 +142,7 @@ public class CanvasController {
         result.map(String::trim)
               .ifPresent(text -> {
                   diagramService.updateElementLabel(element.getId(), text);
+                  notifyDiagramChanged();
                   canvasView.refresh();
               });
     }
@@ -142,7 +151,13 @@ public class CanvasController {
         if (!paletteController.isSelectMode()) return false;
 
         diagramService.moveElement(element.getId(), x, y);
+        notifyDiagramChanged();
         return true;
+    }
+
+    private void onNodeDragFinished(DiagramElement element) {
+        diagramService.autoSaveIfSaved();
+        notifyDiagramChanged();
     }
 
     private void onConnectorDragStart(DiagramElement element, double anchorX, double anchorY) {
@@ -180,6 +195,7 @@ public class CanvasController {
                 pendingSourceAnchorX, pendingSourceAnchorY,
                 target.getAnchorX(), target.getAnchorY()
             );
+            notifyDiagramChanged();
         }
         clearPendingConnector();
     }
@@ -197,5 +213,11 @@ public class CanvasController {
         canvasView.clearHighlight();
         paletteController.clearAll();
         paletteView.clearActive();
+    }
+
+    private void notifyDiagramChanged() {
+        if (onDiagramChanged != null) {
+            onDiagramChanged.run();
+        }
     }
 }
