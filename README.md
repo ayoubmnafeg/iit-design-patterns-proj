@@ -1,9 +1,9 @@
-# ProjMod
+# IIT Design Patterns Project
 
 **Author:** [Ayoub MNAFEG](https://github.com/ayoubmnafeg)
 **School / context:** IIT
 
-Java school project (ProjMod) from IIT.
+Java school project on design patterns from IIT.
 
 ## About
 
