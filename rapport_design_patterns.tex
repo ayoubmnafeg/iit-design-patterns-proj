@@ -1,0 +1,662 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{tikz}
+\usepackage{graphicx}
+\usepackage{hyperref}
+
+\usetikzlibrary{arrows.meta,positioning,shapes.multipart,calc}
+
+\geometry{margin=2.2cm}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=blue
+}
+
+\tikzset{
+    umlclass/.style={
+        rectangle split,
+        rectangle split parts=3,
+        draw,
+        rounded corners=2pt,
+        align=left,
+        text width=4.7cm,
+        minimum height=1cm,
+        font=\scriptsize
+    },
+    umlsmall/.style={
+        rectangle split,
+        rectangle split parts=2,
+        draw,
+        rounded corners=2pt,
+        align=left,
+        text width=4cm,
+        minimum height=0.8cm,
+        font=\scriptsize
+    },
+    umlnote/.style={
+        draw,
+        rounded corners=2pt,
+        align=left,
+        text width=4.7cm,
+        fill=gray!8,
+        font=\scriptsize
+    },
+    relation/.style={-{Latex[length=2.5mm]}, thick},
+    inherit/.style={-{Triangle[open,length=2.5mm,width=2.5mm]}, thick},
+    implement/.style={-{Triangle[open,length=2.5mm,width=2.5mm]}, thick, dashed},
+    implementLine/.style={thick, dashed},
+    depend/.style={-{Latex[length=2.5mm]}, thick, dashed}
+}
+
+\newenvironment{umlfigure}
+{\begin{center}\resizebox{0.90\textwidth}{!}\bgroup}
+{\egroup\end{center}}
+
+\newcommand{\classlist}[1]{%
+    \begin{tabular}[t]{@{}l@{}}#1\end{tabular}%
+}
+
+\title{Rapport sur les Design Patterns du modeleur BPMN}
+\author{Projet \texttt{projmod}}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+Ce rapport présente les design patterns employés dans l'application de modélisation BPMN. L'application permet de créer des éléments BPMN, de relier des éléments par des flux, de modifier ou supprimer des objets du diagramme, d'annuler et rétablir des actions, de sauvegarder et charger les projets et de journaliser les opérations.
+
+La structure du rapport suit directement les patterns utilisés dans le code source. Chaque section décrit un pattern, son rôle dans le projet, les classes concernées et une modélisation UML. Les diagrammes UML sont redimensionnés pour tenir dans la largeur utile d'une page A4.
+
+\section{Singleton}
+
+\subsection{Intention}
+
+Le pattern \textbf{Singleton} garantit qu'une classe ne possède qu'une seule instance globale. Il est utilisé lorsque plusieurs parties de l'application doivent accéder à une ressource partagée sans créer plusieurs objets concurrents.
+
+\subsection{Application dans le projet}
+
+Deux classes illustrent ce pattern :
+
+\begin{itemize}
+    \item \texttt{DBConnectionManager} centralise l'accès JDBC. Son constructeur privé charge \texttt{db.properties}, ouvre la connexion et prépare le schéma.
+    \item \texttt{AppLogger} centralise la journalisation. Il conserve la stratégie active et la liste observable des messages affichés dans l'interface.
+\end{itemize}
+
+\subsection{Modélisation UML}
+
+\begin{umlfigure}
+\begin{tikzpicture}[node distance=1.3cm and 1.8cm]
+    \node[umlclass] (db) {
+        \textbf{DBConnectionManager}
+        \nodepart{second}
+        - instance\\
+        - connection
+        \nodepart{third}
+        - DBConnectionManager()\\
+        + getInstance()\\
+        + getConnection()
+    };
+    \node[umlclass, right=of db] (logger) {
+        \textbf{AppLogger}
+        \nodepart{second}
+        - strategy\\
+        - entries\\
+        - Holder.INSTANCE
+        \nodepart{third}
+        - AppLogger()\\
+        + getInstance()\\
+        + setStrategy()\\
+        + log()
+    };
+    \node[umlclass, below=of db] (daoImpl) {
+        \textbf{DiagramDAOImpl}\\
+        \textbf{LogDAOImpl}
+        \nodepart{second}
+        - conn
+        \nodepart{third}
+        utilise la connexion partagée
+    };
+    \node[umlclass, below=of logger] (views) {
+        \textbf{Services et vues}
+        \nodepart{second}
+        LoggingService\\
+        LogConsoleView
+        \nodepart{third}
+        utilisent le logger partagé
+    };
+
+    \draw[relation] (daoImpl) -- (db);
+    \draw[relation] (views) -- (logger);
+\end{tikzpicture}
+\end{umlfigure}
+
+\subsection{Apport}
+
+Le singleton évite de multiplier les connexions SQL et donne un point d'entrée unique pour les logs. Les services n'ont pas besoin de transporter ces objets partout dans leurs signatures.
+
+\section{Abstract Factory}
+
+\subsection{Intention}
+
+Le pattern \textbf{Abstract Factory} fournit une famille d'objets liés sans imposer les classes concrètes au client. Dans ce projet, les objets liés sont les fabriques d'éléments BPMN : une fabrique pour les noeuds et une fabrique pour les flux.
+
+\subsection{Application dans le projet}
+
+\texttt{BPMNElementFamilyFactory} expose les méthodes \texttt{nodes()} et \texttt{flows()}. \texttt{DefaultBPMNElementFamilyFactory} fournit une famille cohérente composée de \texttt{BPMNNodeElementFactory} et de \texttt{BPMNFlowElementFactory}.
+
+Cette organisation permet à \texttt{BPMNElementFactory}, aux imports JSON et à l'adapter JDBC d'obtenir des fabriques compatibles sans connaître directement leur construction.
+
+\subsection{Modélisation UML}
+
+\begin{umlfigure}
+\begin{tikzpicture}[node distance=1.15cm and 1.45cm]
+    \node[umlclass] (family) {
+        \textbf{\textless\textless interface\textgreater\textgreater}\\
+        \textbf{BPMNElementFamilyFactory}
+        \nodepart{second}
+        nodes()\\
+        flows()
+        \nodepart{third}
+        Fabrique abstraite
+    };
+    \node[umlclass, below=of family] (default) {
+        \textbf{DefaultBPMNElement}\\
+        \textbf{FamilyFactory}
+        \nodepart{second}
+        nodes()\\
+        flows()
+        \nodepart{third}
+        retourne les fabriques concrètes
+    };
+    \node[umlsmall, right=of family] (nodeInt) {
+        \textbf{\textless\textless interface\textgreater\textgreater}\\
+        \textbf{NodeElementFactory}
+        \nodepart{second}
+        createElement()\\
+        createElementWithStoredId()
+    };
+    \node[umlsmall, right=of default] (flowInt) {
+        \textbf{\textless\textless interface\textgreater\textgreater}\\
+        \textbf{FlowElementFactory}
+        \nodepart{second}
+        createFlow()\\
+        createFlowWithStoredId()
+    };
+    \node[umlsmall, right=of nodeInt] (nodeConcrete) {
+        \textbf{BPMNNodeElement}\\
+        \textbf{Factory}
+        \nodepart{second}
+        crée les événements, tâches et gateways
+    };
+    \node[umlsmall, right=of flowInt] (flowConcrete) {
+        \textbf{BPMNFlowElement}\\
+        \textbf{Factory}
+        \nodepart{second}
+        crée les SequenceFlowElement
+    };
+
+    \draw[implement] (default) -- (family);
+    \draw[relation] (family.east) -- (nodeInt.west);
+    \draw[relation] (default.east) -- (flowInt.west);
+    \draw[implement] (nodeConcrete) -- (nodeInt);
+    \draw[implement] (flowConcrete) -- (flowInt);
+\end{tikzpicture}
+\end{umlfigure}
+
+\subsection{Apport}
+
+La création des noeuds et des flux reste groupée dans une même famille logique. Si une autre notation ou une autre variante BPMN devait être supportée, une nouvelle famille de fabriques pourrait être ajoutée avec un impact limité.
+
+\section{Factory Method}
+
+\subsection{Intention}
+
+Le pattern \textbf{Factory Method} délègue la création d'objets à une méthode spécialisée. Le code client demande un objet à partir d'un type métier, sans appeler directement le constructeur concret.
+
+\subsection{Application dans le projet}
+
+\texttt{ElementFactory} définit \texttt{createElement(type, x, y)}. \texttt{BPMNElementFactory} implémente cette méthode et délègue aux fabriques spécialisées. \texttt{BPMNNodeElementFactory} choisit la classe concrète selon \texttt{ElementType} : \texttt{TaskElement}, \texttt{StartEventElement}, \texttt{ExclusiveGatewayElement}, etc. \texttt{BPMNFlowElementFactory} construit les \texttt{SequenceFlowElement}.
+
+Le même mécanisme sert à créer des éléments depuis le canvas, depuis l'import JSON et depuis les données lues en base.
+
+\subsection{Modélisation UML}
+
+\begin{umlfigure}
+\begin{tikzpicture}[x=1cm,y=1cm]
+    \node[umlclass] (interface) at (-3.0,4.7) {
+        \textbf{\textless\textless interface\textgreater\textgreater}\\
+        \textbf{ElementFactory}
+        \nodepart{second}
+        createElement(type,x,y)
+        \nodepart{third}
+        Méthode de création
+    };
+    \node[umlclass] (mainFactory) at (-3.0,2.0) {
+        \textbf{BPMNElementFactory}
+        \nodepart{second}
+        family
+        \nodepart{third}
+        createElement()\\
+        createFlow()
+    };
+    \node[umlclass] (family) at (-3.0,-0.85) {
+        \textbf{\textless\textless interface\textgreater\textgreater}\\
+        \textbf{BPMNElement}\\
+        \textbf{FamilyFactory}
+        \nodepart{second}
+        nodes()\\
+        flows()
+        \nodepart{third}
+        fournit les fabriques
+    };
+    \node[umlsmall] (nodeInterface) at (3.8,0.65) {
+        \textbf{\textless\textless interface\textgreater\textgreater}\\
+        \textbf{NodeElementFactory}
+        \nodepart{second}
+        createElement()\\
+        createElementWithStoredId()
+    };
+    \node[umlsmall] (nodeFactory) at (10.0,0.65) {
+        \textbf{BPMNNodeElement}\\
+        \textbf{Factory}
+        \nodepart{second}
+        crée les noeuds BPMN
+    };
+    \node[umlsmall] (flowInterface) at (3.8,-1.95) {
+        \textbf{\textless\textless interface\textgreater\textgreater}\\
+        \textbf{FlowElementFactory}
+        \nodepart{second}
+        createFlow()\\
+        createFlowWithStoredId()
+    };
+    \node[umlsmall] (flowFactory) at (10.0,-1.95) {
+        \textbf{BPMNFlowElement}\\
+        \textbf{Factory}
+        \nodepart{second}
+        crée les SequenceFlowElement
+    };
+    \node[umlclass] (elements) at (-3.0,-4.8) {
+        \textbf{\textless\textless abstract\textgreater\textgreater}\\
+        \textbf{DiagramElement}
+        \nodepart{second}
+        id, x, y\\
+        label
+        \nodepart{third}
+        getType()
+    };
+    \node[umlsmall] (concreteElements) at (3.8,-4.8) {
+        \textbf{Éléments concrets}
+        \nodepart{second}
+        TaskElement\\
+        StartEventElement\\
+        ExclusiveGatewayElement\\
+        SequenceFlowElement
+    };
+
+    \draw[implement] (mainFactory) -- (interface);
+    \draw[relation] (mainFactory) -- (family);
+    \draw[relation] (family.east) -- ++(0.35,0) |- (nodeInterface.west);
+    \draw[relation] (family.east) -- ++(0.35,0) |- (flowInterface.west);
+    \draw[implement] (nodeFactory) -- (nodeInterface);
+    \draw[implement] (flowFactory) -- (flowInterface);
+    \draw[inherit] (concreteElements.west) -- (elements.east);
+\end{tikzpicture}
+\end{umlfigure}
+
+\subsection{Apport}
+
+Les contrôleurs et services restent indépendants des constructeurs concrets. Ajouter un nouveau type BPMN revient surtout à ajouter la classe du modèle, compléter \texttt{ElementType} et enrichir la fabrique.
+
+\section{Strategy}
+
+\subsection{Intention}
+
+Le pattern \textbf{Strategy} rend interchangeable un comportement derrière une interface commune. Le choix de l'algorithme ou de la destination peut changer à l'exécution.
+
+\subsection{Application dans le projet}
+
+\texttt{LoggerStrategy} définit le contrat \texttt{log(action)} et \texttt{getName()}. Les classes \texttt{ConsoleLogger}, \texttt{FileLogger}, \texttt{DatabaseLogger} et \texttt{UILogger} implémentent chacune une destination différente. \texttt{LoggingService} choisit la stratégie active, puis \texttt{AppLogger} délègue l'écriture à cette stratégie.
+
+\subsection{Modélisation UML}
+
+\begin{umlfigure}
+\begin{tikzpicture}[x=1cm,y=1cm]
+    \node[umlclass] (service) at (0,6.6) {
+        \textbf{LoggingService}
+        \nodepart{second}
+        consoleLogger\\
+        fileLogger\\
+        uiLogger
+        \nodepart{third}
+        setStrategyByIndex()\\
+        cycleStrategy()
+    };
+    \node[umlclass] (appLogger) at (0,3.6) {
+        \textbf{AppLogger}
+        \nodepart{second}
+        strategy\\
+        entries
+        \nodepart{third}
+        setStrategy()\\
+        log()
+    };
+    \node[umlclass] (strategy) at (0,0.6) {
+        \textbf{\textless\textless interface\textgreater\textgreater}\\
+        \textbf{LoggerStrategy}
+        \nodepart{second}
+        log(action)\\
+        getName()
+        \nodepart{third}
+        Contrat commun
+    };
+    \node[umlsmall] (console) at (-6.6,-2.4) {
+        \textbf{ConsoleLogger}
+        \nodepart{second}
+        stdout
+    };
+    \node[umlsmall] (file) at (-2.2,-2.4) {
+        \textbf{FileLogger}
+        \nodepart{second}
+        bpmn-log.txt
+    };
+    \node[umlsmall] (db) at (2.2,-2.4) {
+        \textbf{DatabaseLogger}
+        \nodepart{second}
+        LogDAO
+    };
+    \node[umlsmall] (ui) at (6.6,-2.4) {
+        \textbf{UILogger}
+        \nodepart{second}
+        journal UI
+    };
+
+    \draw[relation] (service.south) -- (appLogger.north);
+    \draw[relation] (appLogger.south) -- (strategy.north);
+    \coordinate (strategyJoin) at (0,-1.05);
+    \draw[implement] (strategyJoin) -- (strategy.south);
+    \draw[implementLine] (console.north) |- (strategyJoin);
+    \draw[implementLine] (file.north) |- (strategyJoin);
+    \draw[implementLine] (db.north) |- (strategyJoin);
+    \draw[implementLine] (ui.north) |- (strategyJoin);
+\end{tikzpicture}
+\end{umlfigure}
+
+\subsection{Apport}
+
+La destination des logs peut changer sans modifier le code métier. Une nouvelle destination de journalisation nécessite simplement une nouvelle classe implémentant \texttt{LoggerStrategy}.
+
+\section{Command}
+
+\subsection{Intention}
+
+Le pattern \textbf{Command} encapsule une action dans un objet. Il devient alors possible de stocker l'action, de l'exécuter plus tard, de l'annuler ou de la rejouer.
+
+\subsection{Application dans le projet}
+
+\texttt{Command} définit \texttt{execute()} et \texttt{undo()}. \texttt{AddElementCommand} ajoute un élément puis peut supprimer cet ajout. \texttt{RemoveElementCommand} supprime un ou plusieurs éléments puis peut les restaurer. \texttt{CommandManager} conserve deux piles : l'historique d'annulation et l'historique de rétablissement.
+
+\subsection{Modélisation UML}
+
+\begin{umlfigure}
+\begin{tikzpicture}[x=1cm,y=1cm]
+    \node[umlclass] (command) at (0,4.8) {
+        \textbf{\textless\textless interface\textgreater\textgreater}\\
+        \textbf{Command}
+        \nodepart{second}
+        execute()\\
+        undo()
+        \nodepart{third}
+        Action réversible
+    };
+    \node[umlclass] (manager) at (5.8,4.8) {
+        \textbf{CommandManager}
+        \nodepart{second}
+        history\\
+        redoHistory
+        \nodepart{third}
+        executeCommand()\\
+        undo()\\
+        redo()
+    };
+    \node[umlclass] (add) at (-3.1,1.2) {
+        \textbf{AddElementCommand}
+        \nodepart{second}
+        diagram\\
+        element
+        \nodepart{third}
+        execute: addElement\\
+        undo: removeElement
+    };
+    \node[umlclass] (remove) at (3.1,1.2) {
+        \textbf{RemoveElement}\\
+        \textbf{Command}
+        \nodepart{second}
+        diagram\\
+        elements
+        \nodepart{third}
+        execute: remove\\
+        undo: restore
+    };
+    \node[umlclass] (diagram) at (0,-2.0) {
+        \textbf{Diagram}
+        \nodepart{second}
+        elements
+        \nodepart{third}
+        addElement()\\
+        removeElement()
+    };
+
+    \coordinate (commandJoin) at (0,2.95);
+    \draw[implement] (commandJoin) -- (command.south);
+    \draw[implementLine] (add.north) |- (commandJoin);
+    \draw[implementLine] (remove.north) |- (commandJoin);
+    \draw[relation] (manager.west) -- (command.east);
+    \draw[relation] (add.south) -- (diagram.north);
+    \draw[relation] (remove.south) -- (diagram.north);
+\end{tikzpicture}
+\end{umlfigure}
+
+\subsection{Apport}
+
+L'annulation et le rétablissement restent indépendants de l'interface graphique. Chaque nouvelle action réversible peut être ajoutée sous forme d'une nouvelle commande.
+
+\section{Observer}
+
+\subsection{Intention}
+
+Le pattern \textbf{Observer} synchronise automatiquement des objets dépendants. Lorsqu'un sujet observable change, ses observateurs reçoivent une notification et peuvent se mettre à jour.
+
+\subsection{Application dans le projet}
+
+Le projet utilise l'implémentation JavaFX de ce pattern avec \texttt{ObservableList} et \texttt{ListChangeListener}. \texttt{Diagram} expose la liste observable \texttt{elements}. \texttt{CanvasView} et \texttt{MainController} écoutent cette liste pour rafraîchir l'affichage et l'état des contrôles. \texttt{AppLogger} expose aussi une liste observable \texttt{entries}, suivie par \texttt{LogConsoleView}.
+
+\subsection{Modélisation UML}
+
+\begin{umlfigure}
+\begin{tikzpicture}[node distance=1.45cm and 1.65cm]
+    \node[umlclass] (diagram) {
+        \textbf{Diagram}
+        \nodepart{second}
+        ObservableList\\
+        \textless DiagramElement\textgreater elements
+        \nodepart{third}
+        Sujet observable du modèle
+    };
+    \node[umlclass, right=of diagram] (listener) {
+        \textbf{ListChangeListener}
+        \nodepart{second}
+        onChanged(change)
+        \nodepart{third}
+        Notification JavaFX
+    };
+    \node[umlclass, right=of listener] (canvas) {
+        \textbf{CanvasView}
+        \nodepart{second}
+        refresh()
+        \nodepart{third}
+        Redessine le diagramme
+    };
+    \node[umlclass, below=of canvas] (controller) {
+        \textbf{MainController}
+        \nodepart{second}
+        refreshProjectState()
+        \nodepart{third}
+        Met à jour l'état UI
+    };
+    \node[umlclass, below=of diagram] (appLogger) {
+        \textbf{AppLogger}
+        \nodepart{second}
+        ObservableList\\
+        \textless String\textgreater entries
+        \nodepart{third}
+        Sujet observable des logs
+    };
+    \node[umlclass, right=of appLogger] (logView) {
+        \textbf{LogConsoleView}
+        \nodepart{second}
+        textArea
+        \nodepart{third}
+        Affiche les entrées ajoutées
+    };
+
+    \draw[relation] (diagram) -- (listener);
+    \draw[relation] (listener) -- (canvas);
+    \draw[relation] (listener) -- (controller);
+    \draw[relation] (appLogger) -- (logView);
+\end{tikzpicture}
+\end{umlfigure}
+
+\subsection{Apport}
+
+Le modèle n'a pas besoin d'appeler directement les vues. Les vues restent synchronisées avec les ajouts, suppressions et chargements, ce qui réduit le couplage entre l'état métier et l'affichage.
+
+\section{Adapter}
+
+\subsection{Intention}
+
+Le pattern \textbf{Adapter} convertit l'interface ou le format d'une source de données vers le format attendu par le reste de l'application. Il permet de préserver le modèle métier des détails techniques externes.
+
+\subsection{Application dans le projet}
+
+\texttt{DiagramElementJdbcAdapter} transforme une ligne \texttt{ResultSet} en \texttt{DiagramElement}. Il lit les colonnes SQL, récupère le \texttt{ElementType}, puis utilise les fabriques BPMN pour reconstruire soit un noeud, soit un \texttt{SequenceFlowElement}. Dans le cas d'un flux, il restaure aussi les ancres source et cible.
+
+L'adapter est utilisé par \texttt{DiagramDAOImpl} pendant le chargement d'un diagramme. La classe DAO reste responsable des requêtes SQL, tandis que l'adapter isole la conversion entre représentation relationnelle et objet métier.
+
+\subsection{Modélisation UML}
+
+\begin{umlfigure}
+\begin{tikzpicture}[node distance=1.45cm and 1.65cm]
+    \node[umlclass] (dao) {
+        \textbf{DiagramDAOImpl}
+        \nodepart{second}
+        conn\\
+        elementAdapter
+        \nodepart{third}
+        load()\\
+        save()
+    };
+    \node[umlsmall, above=of dao] (daoInterface) {
+        \textbf{\textless\textless interface\textgreater\textgreater}\\
+        \textbf{DiagramDAO}
+        \nodepart{second}
+        save()\\
+        load()\\
+        listAll()
+    };
+    \node[umlclass, right=of dao] (adapter) {
+        \textbf{DiagramElement}\\
+        \textbf{JdbcAdapter}
+        \nodepart{second}
+        nodeFactory\\
+        flowFactory
+        \nodepart{third}
+        fromRow(ResultSet)
+    };
+    \node[umlclass, right=of adapter] (rs) {
+        \textbf{ResultSet}
+        \nodepart{second}
+        id, type, x, y\\
+        source\_id, target\_id
+        \nodepart{third}
+        ligne SQL
+    };
+    \node[umlclass, below=of adapter] (element) {
+        \textbf{DiagramElement}
+        \nodepart{second}
+        noeuds BPMN\\
+        SequenceFlowElement
+        \nodepart{third}
+        objet du domaine
+    };
+
+    \draw[implement] (dao) -- (daoInterface);
+    \draw[relation] (dao) -- (adapter);
+    \draw[depend] (adapter) -- (rs);
+    \draw[relation] (adapter) -- (element);
+\end{tikzpicture}
+\end{umlfigure}
+
+\subsection{Apport}
+
+Le code de persistance ne répand pas la logique de reconstruction des éléments BPMN. Si le format SQL change, les modifications restent principalement localisées dans l'adapter et la couche de persistance.
+
+\section{Synthèse}
+
+\begingroup
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.25}
+\begin{longtable}{|>{\raggedright\arraybackslash}p{2.6cm}|>{\raggedright\arraybackslash}p{4.8cm}|>{\raggedright\arraybackslash}p{6.7cm}|}
+\hline
+\textbf{Pattern} & \textbf{Classes principales} & \textbf{Rôle dans le projet} \\
+\hline
+Singleton &
+\classlist{\texttt{DBConnectionManager}\\ \texttt{AppLogger}} &
+Fournir un accès global contrôlé à la connexion SQL et au logger applicatif. \\
+\hline
+Abstract Factory &
+\classlist{\texttt{BPMNElementFamily}\\ \texttt{Factory}\\ \texttt{DefaultBPMNElement}\\ \texttt{FamilyFactory}} &
+Regrouper les fabriques compatibles pour les noeuds et les flux BPMN. \\
+\hline
+Factory Method &
+\classlist{\texttt{ElementFactory}\\ \texttt{BPMNElementFactory}\\ \texttt{BPMNNodeElement}\\ \texttt{Factory}\\ \texttt{BPMNFlowElement}\\ \texttt{Factory}} &
+Créer les éléments BPMN sans exposer les constructeurs concrets au client. \\
+\hline
+Strategy &
+\classlist{\texttt{LoggerStrategy}\\ \texttt{ConsoleLogger}\\ \texttt{FileLogger}\\ \texttt{DatabaseLogger}\\ \texttt{UILogger}} &
+Rendre interchangeable la destination de journalisation. \\
+\hline
+Command &
+\classlist{\texttt{Command}\\ \texttt{AddElementCommand}\\ \texttt{RemoveElement}\\ \texttt{Command}\\ \texttt{CommandManager}} &
+Encapsuler les actions réversibles pour l'annulation et le rétablissement. \\
+\hline
+Observer &
+\classlist{\texttt{ObservableList}\\ \texttt{ListChangeListener}\\ \texttt{CanvasView}\\ \texttt{LogConsoleView}} &
+Synchroniser automatiquement les vues avec le modèle et les logs. \\
+\hline
+Adapter &
+\classlist{\texttt{DiagramElement}\\ \texttt{JdbcAdapter}} &
+Convertir une ligne SQL en élément BPMN exploitable par le domaine. \\
+\hline
+\end{longtable}
+\endgroup
+
+\section{Conclusion}
+
+Le projet \texttt{projmod} applique plusieurs design patterns complémentaires. Les patterns de création structurent la construction des éléments BPMN, les patterns comportementaux organisent les actions réversibles, les notifications et la journalisation, tandis que les patterns liés à la persistance isolent les détails techniques de la base de données.
+
+Cette architecture améliore la lisibilité du code et limite le couplage entre les couches. Elle rend aussi l'application plus extensible : ajouter un type BPMN, une nouvelle stratégie de log, une nouvelle commande ou une autre solution de stockage peut se faire en respectant les points d'extension déjà présents.
+
+\end{document}
